@@ -1,0 +1,102 @@
+
+---
+title: "No-way Home"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(flexdashboard) 
+library(highcharter) 
+library(plotly) 
+library(viridis) 
+library(tidyverse) 
+library(countrycode) 
+library(rjson) 
+library(crosstalk) 
+library(DT)
+```
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+```{r}
+data = read.csv("C:/Users/MostafaMohamedIsmail/Desktop/master.csv", sep =",")
+cleanedData=subset(data,select=-c(country.year,HDI.for.year))
+cleanedData=rename(cleanedData, "country"="ï..country","suicides(/100k.pop)"="suicides.100k.pop",
+                   "gdp.peryear($)" = "gdp_for_year....","gdp.percapita($)" = "gdp_per_capita....")
+cleanedData=mutate_at(cleanedData,c("country","sex", "age", "generation"), as.factor)
+cleanedData=mutate(cleanedData,generation = factor(generation, levels = c("G.I. Generation", "Silent", "Boomers", "Generation X",
+                                                                          "Millenials","Generation Z")))
+cleanedData=mutate(cleanedData,age = factor(age, levels = c("5-14 years",
+                                                            "15-24 years",
+                                                            "25-34 years",
+                                                            "35-54 years",
+                                                            "55-74 years",
+                                                            "75+ years")))
+cleanedData=mutate(cleanedData,`gdp.peryear($)` = as.numeric(gsub(",","", `gdp.peryear($)`,fixed = T)))
+library(countrycode)
+cleanedData$continent <- countrycode(sourcevar = cleanedData$country,origin = "country.name",destination = "continent")
+south_america <- c('Argentina', 'Brazil', 'Chile', 'Colombia', 'Ecuador', 'Guyana', 'Paraguay', 'Suriname', 'Uruguay')
+cleanedData$continent[cleanedData$country %in% south_america] <- 'South America'
+cleanedData$continent[cleanedData$continent=='Americas'] <- 'North America'
+```
+
+
+
+
+### Chart A
+
+```{r}
+set.seed(85968)
+country_year_tibble <- cleanedData %>%
+  select(country, year, suicides_no, population) %>%
+  group_by(country, year) %>%
+  summarise(suicide_capita = round((sum(suicides_no)/sum(population))*100000, 2))
+
+shared_data <- SharedData$new(country_year_tibble, group = 'hello')
+
+# Create line graph.
+plot_ly(shared_data, x = ~year, y = ~suicide_capita,  color = ~country, colors = sample(colours(), 120), type = 'scatter', mode = 'lines',
+        hoverinfo = 'text', text = ~paste("Country: ", country, '<br>Year: ', year, "<br>Suicides: ", suicide_capita)) %>%
+  layout(showlegend = FALSE, title = "Suicide by country", xaxis = list(title = "Year"), yaxis = list(title = "Suicides per 100K people")) %>%
+  layout(plot_bgcolor = 'transparent') %>%
+  layout(paper_bgcolor = 'transparent') %>%
+  add_markers() %>%
+  highlight("plotly_click")
+```
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Chart B
+
+```{r}
+country_year_tibble <- cleanedData %>%
+  select(country, year, suicides_no, population) %>%
+  group_by(country, year) %>%
+  summarise(suicide_capita = round((sum(suicides_no)/sum(population))*100000, 2))
+
+shared_data <- SharedData$new(country_year_tibble, group = 'hello')
+
+filter_slider("year", "Year", shared_data, ~year, step = 1)
+filter_select("country", "Country", shared_data, ~country, allLevels = TRUE, multiple = TRUE)
+
+```
+
+
+### Chart c
+
+```{r}
+# Create datatable.
+datatable(shared_data,rownames = FALSE,colnames = c('Country', 'Year', 'Suicides /100K'),class = 'cell-border stripe',
+          extensions = "Scroller",options=list(deferRender = FALSE, scrollY = 200, scrollCollapse = TRUE,scroller = TRUE,dom = 't'))
+filter_slider("year", "Year", shared_data, ~year, step = 1)
+filter_select("country", "Country", shared_data, ~country, allLevels = TRUE, multiple = TRUE)
+
+```
+
+
